@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 
 import AuthLayout from "@/components/auth/AuthLayout";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
@@ -21,37 +20,59 @@ import {
 } from "@/components/ui/form";
 import { signup } from "@/lib/auth";
 
-const signupSchema = z.object({
-  fullName: z
-    .string()
-    .min(2, "Enter your full name")
-    .refine(
-      (val) => val.trim().split(/\s+/).length >= 2,
-      "Enter both your first and last name",
-    ),
-  phone: z
-    .string()
-    .min(1, "Phone number is required")
-    .regex(
-      /^0(70|80|81|90|91)\d{8}$/,
-      "Enter a valid Nigerian phone number",
-    ),
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Include at least one uppercase letter")
-    .regex(/[0-9]/, "Include at least one number"),
-});
+const signupSchema = z
+  .object({
+    fullName: z
+      .string()
+      .min(2, "Enter your full name")
+      .refine(
+        (val) => val.trim().split(/\s+/).length >= 2,
+        "Enter both your first and last name",
+      ),
+
+    phone: z
+      .string()
+      .min(1, "Phone number is required")
+      .regex(
+        /^0(70|80|81|90|91)\d{8}$/,
+        "Enter a valid Nigerian phone number",
+      ),
+
+    email: z
+      .string()
+      .min(1, "Email is required")
+      .email("Enter a valid email address"),
+
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Include at least one uppercase letter")
+      .regex(/[0-9]/, "Include at least one number"),
+
+    transactionPin: z
+      .string()
+      .regex(/^\d{4}$/, "Transaction PIN must contain exactly 4 digits"),
+
+    confirmTransactionPin: z
+      .string()
+      .regex(/^\d{4}$/, "Confirm your 4-digit transaction PIN"),
+  })
+  .refine(
+    (values) => values.transactionPin === values.confirmTransactionPin,
+    {
+      message: "Transaction PINs do not match",
+      path: ["confirmTransactionPin"],
+    },
+  );
 
 type SignupValues = z.infer<typeof signupSchema>;
 
 export default function Signup() {
   const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showTransactionPin, setShowTransactionPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<SignupValues>({
@@ -61,6 +82,8 @@ export default function Signup() {
       phone: "",
       email: "",
       password: "",
+      transactionPin: "",
+      confirmTransactionPin: "",
     },
   });
 
@@ -69,10 +92,11 @@ export default function Signup() {
 
     try {
       await signup({
-        fullName: values.fullName,
-        phone: values.phone,
-        email: values.email,
+        fullName: values.fullName.trim(),
+        phone: values.phone.trim(),
+        email: values.email.trim(),
         password: values.password,
+        transactionPin: values.transactionPin,
       });
 
       navigate("/dashboard");
@@ -98,7 +122,7 @@ export default function Signup() {
           Already have an account?{" "}
           <Link
             to="/login"
-            className="text-primary font-semibold hover:underline"
+            className="font-semibold text-primary hover:underline"
           >
             Log in
           </Link>
@@ -194,7 +218,7 @@ export default function Signup() {
 
                     <button
                       type="button"
-                      onClick={() => setShowPassword((v) => !v)}
+                      onClick={() => setShowPassword((value) => !value)}
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
@@ -213,7 +237,111 @@ export default function Signup() {
                   At least 8 characters, with one uppercase letter and one
                   number.
                 </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
+          <div className="space-y-1 border-t border-border pt-5">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-5 text-primary" />
+              <h3 className="font-semibold">Secure your transactions</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Create a 4-digit PIN to authorize transactions.
+            </p>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="transactionPin"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Transaction PIN</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      {...field}
+                      type={showTransactionPin ? "text" : "password"}
+                      inputMode="numeric"
+                      autoComplete="new-password"
+                      maxLength={4}
+                      placeholder="Enter 4-digit PIN"
+                      className="pr-10 tracking-[0.3em]"
+                      onChange={(event) => {
+                        field.onChange(
+                          event.target.value.replace(/\D/g, "").slice(0, 4),
+                        );
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowTransactionPin((value) => !value)
+                      }
+                      aria-label={
+                        showTransactionPin ? "Hide transaction PIN" : "Show transaction PIN"
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showTransactionPin ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormDescription>
+                  Use a PIN you don&apos;t use for your phone or other accounts.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="confirmTransactionPin"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm transaction PIN</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      {...field}
+                      type={showConfirmPin ? "text" : "password"}
+                      inputMode="numeric"
+                      autoComplete="new-password"
+                      maxLength={4}
+                      placeholder="Re-enter 4-digit PIN"
+                      className="pr-10 tracking-[0.3em]"
+                      onChange={(event) => {
+                        field.onChange(
+                          event.target.value.replace(/\D/g, "").slice(0, 4),
+                        );
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPin((value) => !value)}
+                      aria-label={
+                        showConfirmPin
+                          ? "Hide confirmation PIN"
+                          : "Show confirmation PIN"
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showConfirmPin ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -241,4 +369,3 @@ export default function Signup() {
     </AuthLayout>
   );
 }
-

@@ -4,39 +4,64 @@ import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { isTransferPayload } from "@/lib/transfer";
+import {
+  isCompletedTransfer,
+} from "@/lib/transfer";
+
 import FlowShell from "@/components/shared/FlowShell";
 import FlowHero from "@/components/shared/FlowHero";
 
-const PROCESSING_MS = 2500;
+const PROCESSING_MS = 1800;
 
 export default function TransferProcessing() {
   const navigate = useNavigate();
   const { state } = useLocation();
-  const payload = isTransferPayload(state) ? state : null;
+
+  const payload =
+    isCompletedTransfer(state)
+      ? state
+      : null;
 
   useEffect(() => {
     if (!payload) {
       toast.error(
-        "Transfer was interrupted. Check your transactions for status.",
+        "Transfer information could not be found.",
       );
-      navigate("/transactions", { replace: true });
+
+      navigate(
+        "/transactions",
+        { replace: true },
+      );
+
       return;
     }
 
-    const timer = setTimeout(() => {
-      const reference = `AJR${Date.now().toString().slice(-8)}`;
-      const timestamp = new Date().toISOString();
-      navigate("/transfer/success", {
-        state: { ...payload, reference, timestamp },
-        replace: true,
-      });
+    /**
+     * The actual transfer has already been
+     * completed by the backend before we
+     * reached this screen.
+     *
+     * This delay is only for the processing
+     * animation/UX.
+     */
+    const timer = window.setTimeout(() => {
+      navigate(
+        "/transfer/success",
+        {
+          state: payload,
+          replace: true,
+        },
+      );
     }, PROCESSING_MS);
 
-    return () => clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [payload, navigate]);
 
-  if (!payload) return null;
+  if (!payload) {
+    return null;
+  }
 
   return (
     <FlowShell showBrand>
@@ -44,7 +69,7 @@ export default function TransferProcessing() {
         icon={Loader2}
         iconColor="primary"
         title="Processing your transfer..."
-        description="This usually takes just a few seconds. Please don't close this page."
+        description="Your transfer has been authorized. Please wait while we prepare your receipt."
         animated={false}
         spin
       />
@@ -54,7 +79,13 @@ export default function TransferProcessing() {
           <motion.span
             key={i}
             className="size-2 rounded-full bg-primary"
-            animate={{ opacity: [0.3, 1, 0.3] }}
+            animate={{
+              opacity: [
+                0.3,
+                1,
+                0.3,
+              ],
+            }}
             transition={{
               duration: 1.2,
               repeat: Infinity,

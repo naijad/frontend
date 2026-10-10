@@ -1,3 +1,4 @@
+
 import { apiRequest } from "./api";
 import { user, allTransactions, recentTransactions } from "./mock-data";
 
@@ -7,20 +8,31 @@ interface BackendUser {
   lastName: string;
   email: string;
   phone: string;
-  account?: { accountNumber: string; balance: string; currency: string } | null;
+  account?: {
+    accountNumber: string;
+    balance: string;
+    currency: string;
+  } | null;
 }
 
 interface AuthResponse {
   success: boolean;
   message: string;
-  data: { user: BackendUser; token: string };
+  data: {
+    user: BackendUser;
+    token: string;
+  };
 }
 
 interface DashboardResponse {
   success: boolean;
   data: {
     user: BackendUser;
-    account: { accountNumber: string; balance: string; currency: string } | null;
+    account: {
+      accountNumber: string;
+      balance: string;
+      currency: string;
+    } | null;
     recentTransactions: BackendTransaction[];
   };
 }
@@ -43,8 +55,16 @@ interface BackendTransaction {
 }
 
 function applyUser(apiUser: BackendUser) {
-  const fullName = `${apiUser.firstName} ${apiUser.lastName}`.trim();
-  const initials = fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  const fullName =
+    `${apiUser.firstName} ${apiUser.lastName}`.trim();
+
+  const initials = fullName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   Object.assign(user, {
     name: apiUser.firstName,
     fullName,
@@ -60,61 +80,155 @@ function applyUser(apiUser: BackendUser) {
 function mapTransaction(t: BackendTransaction) {
   const direction = t.direction.toLowerCase();
   const rawType = t.type.toLowerCase();
-  const type = rawType === "transfer" ? (direction === "income" ? "received" : "sent") :
-    (["airtime", "data", "bill", "topup", "received", "sent"].includes(rawType) ? rawType : (direction === "income" ? "received" : "sent"));
+
+  const type =
+    rawType === "transfer"
+      ? direction === "income"
+        ? "received"
+        : "sent"
+      : [
+          "airtime",
+          "data",
+          "bill",
+          "topup",
+          "received",
+          "sent",
+        ].includes(rawType)
+        ? rawType
+        : direction === "income"
+          ? "received"
+          : "sent";
+
   const amount = Number(t.amount);
+
   return {
     id: t.id,
     type: type as any,
-    counterparty: t.recipientName || t.title || "Ajora transaction",
+    counterparty:
+      t.recipientName || t.title || "Ajora transaction",
     counterpartyBank: t.recipientBank || undefined,
     counterpartyAccount: t.recipientAccount || undefined,
     reference: t.reference,
     memo: t.description,
     timestamp: new Date(t.createdAt),
-    amount: direction === "income" ? Math.abs(amount) : -Math.abs(amount),
+    amount:
+      direction === "income"
+        ? Math.abs(amount)
+        : -Math.abs(amount),
     fee: Number(t.fee),
     balanceAfter: 0,
     status: t.status.toLowerCase() as any,
   };
 }
 
-function applyTransactions(transactions: BackendTransaction[]) {
+function applyTransactions(
+  transactions: BackendTransaction[],
+) {
   const mapped = transactions.map(mapTransaction);
-  allTransactions.splice(0, allTransactions.length, ...mapped);
-  recentTransactions.splice(0, recentTransactions.length, ...mapped.slice(0, 5));
+
+  allTransactions.splice(
+    0,
+    allTransactions.length,
+    ...mapped,
+  );
+
+  recentTransactions.splice(
+    0,
+    recentTransactions.length,
+    ...mapped.slice(0, 5),
+  );
 }
 
-export async function login(identifier: string, password: string): Promise<void> {
-  const response = await apiRequest<AuthResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ identifier, password }),
-  });
-  localStorage.setItem("ajora_token", response.data.token);
+export async function login(
+  identifier: string,
+  password: string,
+): Promise<void> {
+  const response = await apiRequest<AuthResponse>(
+    "/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ identifier, password }),
+    },
+  );
+
+  localStorage.setItem(
+    "ajora_token",
+    response.data.token,
+  );
+
   applyUser(response.data.user);
+
   await hydrateSession();
 }
 
-export interface SignupPayload { fullName: string; phone: string; email: string; password: string }
+/**
+ * Signup payload.
+ * The transaction PIN must contain exactly four digits.
+ * confirmTransactionPin is only for frontend validation;
+ * it should not be sent to the backend.
+ */
+export interface SignupPayload {
+  fullName: string;
+  phone: string;
+  email: string;
+  password: string;
+  transactionPin: string;
+}
 
-export async function signup(values: SignupPayload): Promise<void> {
-  const response = await apiRequest<AuthResponse>("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(values),
-  });
-  localStorage.setItem("ajora_token", response.data.token);
+export async function signup(
+  values: SignupPayload,
+): Promise<void> {
+  if (!/^\d{4}$/.test(values.transactionPin)) {
+    throw new Error(
+      "Your transaction PIN must contain exactly 4 digits.",
+    );
+  }
+
+  const response = await apiRequest<AuthResponse>(
+    "/auth/register",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        fullName: values.fullName,
+        phone: values.phone,
+        email: values.email,
+        password: values.password,
+        transactionPin: values.transactionPin,
+      }),
+    },
+  );
+
+  localStorage.setItem(
+    "ajora_token",
+    response.data.token,
+  );
+
   applyUser(response.data.user);
 }
 
 export async function hydrateSession(): Promise<boolean> {
   const token = localStorage.getItem("ajora_token");
+
   if (!token) return false;
+
   try {
-    const me = await apiRequest<{ data: { user: BackendUser } }>("/auth/me");
+    const me = await apiRequest<{
+      data: { user: BackendUser };
+    }>("/auth/me");
+
     applyUser(me.data.user);
-    const dashboard = await apiRequest<DashboardResponse>("/dashboard");
+
+    const dashboard =
+      await apiRequest<DashboardResponse>("/dashboard");
+
     applyUser(dashboard.data.user);
-    if (dashboard.data.recentTransactions) applyTransactions(dashboard.data.recentTransactions);
+
+    if (dashboard.data.recentTransactions) {
+      applyTransactions(
+        dashboard.data.recentTransactions,
+      );
+    }
+
     return true;
   } catch {
     localStorage.removeItem("ajora_token");
@@ -126,15 +240,45 @@ export function logout(): void {
   localStorage.removeItem("ajora_token");
 }
 
-export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  await apiRequest("/auth/password/change", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await apiRequest("/auth/password/change", {
+    method: "POST",
+    body: JSON.stringify({
+      currentPassword,
+      newPassword,
+    }),
+  });
 }
 
-export async function executeTransfer(payload: { recipientName: string; recipientAccount: string; recipientBank: string; amount: number; memo?: string }, pin: string) {
-  const response = await apiRequest<{ data: { transaction: BackendTransaction; account: { balance: string } } }>("/transfers", {
+export async function executeTransfer(
+  payload: {
+    recipientName: string;
+    recipientAccount: string;
+    recipientBank: string;
+    amount: number;
+    memo?: string;
+  },
+  pin: string,
+) {
+  const response = await apiRequest<{
+    data: {
+      transaction: BackendTransaction;
+      account: { balance: string };
+    };
+  }>("/transfers", {
     method: "POST",
-    body: JSON.stringify({ ...payload, amount: String(payload.amount), pin }),
+    body: JSON.stringify({
+      ...payload,
+      amount: String(payload.amount),
+      pin,
+    }),
   });
+
   await hydrateSession();
+
   return response.data;
 }
+

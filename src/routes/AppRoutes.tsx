@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Onboarding from "../pages/Onboarding/Onboarding";
@@ -24,6 +25,18 @@ import TransferPin from "../pages/Transfer/TransferPin";
 import TransferProcessing from "../pages/Transfer/TransferProcessing";
 import TransferSuccess from "../pages/Transfer/TransferSuccess";
 
+import Airtime from "../pages/Airtime/Airtime";
+import AirtimeConfirmation from "../pages/Airtime/AirtimeConfirmation";
+import AirtimePin from "../pages/Airtime/AirtimePin";
+import AirtimeProcessing from "../pages/Airtime/AirtimeProcessing";
+import AirtimeSuccess from "../pages/Airtime/AirtimeSuccess";
+
+import Data from "../pages/Data/Data";
+import DataConfirmation from "../pages/Data/DataConfirmation";
+import DataPin from "../pages/Data/DataPin";
+import DataProcessing from "../pages/Data/DataProcessing";
+import DataSuccess from "../pages/Data/DataSuccess";
+
 import TransactionDetails from "../pages/Transactions/TransactionDetails";
 import TransactionPin from "../pages/Transactions/TransactionPin";
 import ChangeTransactionPin from "../pages/ChangeTransactionPin";
@@ -40,22 +53,13 @@ export default function AppRoutes() {
     <BrowserRouter>
       <ThemeProvider>
         <Routes>
-          {/* =========================
-              AUTHENTICATION
-          ========================= */}
-
+          {/* AUTHENTICATION */}
           <Route path="/" element={<Landing />} />
-
           <Route path="/login" element={<Login />} />
-
           <Route path="/signup" element={<Signup />} />
-
           <Route path="/onboarding" element={<Onboarding />} />
 
-          {/* =========================
-              MAIN NAVIGATION
-          ========================= */}
-
+          {/* MAIN NAVIGATION */}
           <Route
             path="/dashboard"
             element={
@@ -101,22 +105,53 @@ export default function AppRoutes() {
             }
           />
 
-          {/* =========================
-              TRANSFER FLOW
-          ========================= */}
-
-          <Route path="/transfer/confirm" element={<TransferConfirmation />} />
-
+          {/* TRANSFER FLOW */}
+          <Route
+            path="/transfer/confirm"
+            element={<TransferConfirmation />}
+          />
           <Route path="/transfer/pin" element={<TransferPin />} />
+          <Route
+            path="/transfer/processing"
+            element={<TransferProcessing />}
+          />
+          <Route
+            path="/transfer/success"
+            element={<TransferSuccess />}
+          />
 
-          <Route path="/transfer/processing" element={<TransferProcessing />} />
+          {/* AIRTIME FLOW */}
+          <Route path="/airtime" element={<Airtime />} />
+          <Route
+            path="/airtime/confirm"
+            element={<AirtimeConfirmation />}
+          />
+          <Route path="/airtime/pin" element={<AirtimePin />} />
+          <Route
+            path="/airtime/processing"
+            element={<AirtimeProcessing />}
+          />
+          <Route
+            path="/airtime/success"
+            element={<AirtimeSuccess />}
+          />
 
-          <Route path="/transfer/success" element={<TransferSuccess />} />
-
-          {/* =========================
-              TRANSACTIONS
-          ========================= */}
-
+          {/* DATA — MOCK CATALOGUE FOR NOW */}
+         {/* DATA FLOW */}
+            <Route
+              path="/data"
+              element={
+                <MainLayout>
+                  <Data />
+                </MainLayout>
+              }
+            />
+            <Route path="/data/confirm" element={<DataConfirmation />} />
+            <Route path="/data/pin" element={<DataPin />} />
+            <Route path="/data/processing" element={<DataProcessing />} />
+            <Route path="/data/success" element={<DataSuccess />} />
+            
+          {/* TRANSACTIONS */}
           <Route
             path="/transactions/details"
             element={
@@ -153,10 +188,7 @@ export default function AppRoutes() {
             }
           />
 
-          {/* =========================
-              PROFILE
-          ========================= */}
-
+          {/* PROFILE */}
           <Route
             path="/profile/preferences"
             element={
@@ -202,10 +234,7 @@ export default function AppRoutes() {
             }
           />
 
-          {/* =========================
-              PASSWORD
-          ========================= */}
-
+          {/* PASSWORD */}
           <Route
             path="/profile/security/password"
             element={
@@ -220,7 +249,7 @@ export default function AppRoutes() {
             element={<PasswordChangeSuccess />}
           />
 
-          {/* Catch-all — unknown / not-yet-built routes */}
+          {/* CATCH ALL */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </ThemeProvider>

@@ -1,4 +1,5 @@
-const API_BASE_URL = "https://backend-eight-steel-35.vercel.app/api";
+const API_BASE_URL = "http://localhost:2000/api";
+// for deployment, change the above to "https://backend-eight-steel-35.vercel.app/api"
 
 export type ApiRequestOptions = RequestInit & { token?: string };
 
@@ -13,7 +14,7 @@ export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions
   try {
     response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
   } catch {
-   throw new Error("Unable to connect to the Ajora server. Please try again.");
+    throw new Error("Unable to connect to the Ajora server. Make sure the backend is running on port 2000.");
   }
 
   let data: any = null;
