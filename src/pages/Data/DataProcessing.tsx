@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  CheckCircle2,
   CircleAlert,
   Database,
   LoaderCircle,
