@@ -18,20 +18,29 @@ type PurchaseRouteState = DataPurchaseState & {
   pin: string;
 };
 
+type DataTransaction = {
+  id?: string;
+  reference?: string;
+  status?: string;
+  amount?: number | string;
+  createdAt?: string;
+  updatedAt?: string;
+  balanceAfter?: number | string;
+};
+
 type DataApiResult = {
   success?: boolean;
   message?: string;
   status?: string;
   reference?: string;
   transactionReference?: string;
-  transaction?: {
-    id?: string;
-    reference?: string;
-    status?: string;
-    amount?: number | string;
-    createdAt?: string;
-    balanceAfter?: number | string;
+  transaction?: DataTransaction;
+  account?: {
+    accountNumber?: string;
+    balance?: number | string;
+    currency?: string;
   };
+  data?: DataApiResult;
   balanceAfter?: number | string;
   [key: string]: unknown;
 };
@@ -44,10 +53,35 @@ type ApiEnvelope = {
 
 type ScreenStatus = "processing" | "pending" | "failed";
 
+const SUCCESS_STATUSES = [
+  "COMPLETED",
+  "SUCCESS",
+  "SUCCESSFUL",
+];
+
+const FAILURE_STATUSES = [
+  "FAILED",
+  "FAILURE",
+  "REVERSED",
+  "CANCELLED",
+];
+
 function getStatus(result: DataApiResult): string {
+  // Initial purchase response:
+  // response.data.data.transaction.status
+  //
+  // Requery response:
+  // response.data.status or response.data.transaction.status
+
   return String(
-    result.status ?? result.transaction?.status ?? "",
-  ).trim().toUpperCase();
+    result.status ??
+      result.transaction?.status ??
+      result.data?.status ??
+      result.data?.transaction?.status ??
+      "",
+  )
+    .trim()
+    .toUpperCase();
 }
 
 function getReference(result: DataApiResult): string {
@@ -55,8 +89,26 @@ function getReference(result: DataApiResult): string {
     result.reference ??
       result.transactionReference ??
       result.transaction?.reference ??
+      result.data?.reference ??
+      result.data?.transactionReference ??
+      result.data?.transaction?.reference ??
       "",
   ).trim();
+}
+
+function normalizeResult(result: DataApiResult): DataApiResult {
+  // Make the transaction available at the top level for the
+  // success page, regardless of the backend response nesting.
+  const nested = result.data;
+
+  return {
+    ...result,
+    status: getStatus(result),
+    reference: getReference(result),
+    transaction:
+      result.transaction ?? nested?.transaction,
+    account: result.account ?? nested?.account,
+  };
 }
 
 export default function DataProcessing() {
@@ -65,11 +117,14 @@ export default function DataProcessing() {
   const purchase = location.state as PurchaseRouteState | null;
 
   const startedRef = useRef(false);
+
   const [screenStatus, setScreenStatus] =
     useState<ScreenStatus>("processing");
+
   const [message, setMessage] = useState(
     "Submitting your data purchase securely.",
   );
+
   const [result, setResult] = useState<DataApiResult | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
 
@@ -85,6 +140,28 @@ export default function DataProcessing() {
 
   const reference = result ? getReference(result) : "";
 
+  function goToSuccess(purchaseResult: DataApiResult) {
+    navigate("/data/success", {
+      replace: true,
+      state: {
+        purchase: {
+          network: purchase!.network,
+          networkName: purchase!.networkName,
+          phone: purchase!.phone,
+          displayPhone: purchase!.displayPhone,
+          bundleId: purchase!.bundleId,
+          variationCode: purchase!.variationCode,
+          bundleName: purchase!.bundleName,
+          validity: purchase!.validity,
+          amount: purchase!.amount,
+          fee: purchase!.fee,
+          total: purchase!.total,
+        },
+        result: normalizeResult(purchaseResult),
+      },
+    });
+  }
+
   useEffect(() => {
     if (!isValidPurchase) {
       navigate("/data", { replace: true });
@@ -92,21 +169,24 @@ export default function DataProcessing() {
     }
 
     if (startedRef.current || !purchase) return;
-    startedRef.current = true;
 
+    startedRef.current = true;
     let cancelled = false;
 
     async function submitPurchase() {
       try {
-        const response = await apiRequest<ApiEnvelope>("/data/purchase", {
-          method: "POST",
-          body: JSON.stringify({
-            network: purchase!.network,
-            phone: purchase!.phone,
-            variationCode: purchase!.variationCode,
-            pin: purchase!.pin,
-          }),
-        });
+        const response = await apiRequest<ApiEnvelope>(
+          "/data/purchase",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              network: purchase!.network,
+              phone: purchase!.phone,
+              variationCode: purchase!.variationCode,
+              pin: purchase!.pin,
+            }),
+          },
+        );
 
         if (cancelled) return;
 
@@ -125,42 +205,28 @@ export default function DataProcessing() {
 
         const status = getStatus(purchaseResult);
 
-        if (["COMPLETED", "SUCCESS", "SUCCESSFUL"].includes(status)) {
-          navigate("/data/success", {
-            replace: true,
-            state: {
-              purchase: {
-                network: purchase!.network,
-                networkName: purchase!.networkName,
-                phone: purchase!.phone,
-                displayPhone: purchase!.displayPhone,
-                bundleId: purchase!.bundleId,
-                variationCode: purchase!.variationCode,
-                bundleName: purchase!.bundleName,
-                validity: purchase!.validity,
-                amount: purchase!.amount,
-                fee: purchase!.fee,
-                total: purchase!.total,
-              },
-              result: purchaseResult,
-            },
-          });
+        if (SUCCESS_STATUSES.includes(status)) {
+          setMessage(
+            purchaseResult.message ||
+              "Data purchase completed successfully.",
+          );
+          goToSuccess(purchaseResult);
           return;
         }
 
-        if (["FAILED", "FAILURE", "REVERSED", "CANCELLED"].includes(status)) {
+        if (FAILURE_STATUSES.includes(status)) {
           setScreenStatus("failed");
           setMessage(
-            response.message ||
-              "The provider did not complete this data purchase. Check your balance and transaction history.",
+            purchaseResult.message ||
+              "The provider reported that this data purchase failed. Check your transaction history.",
           );
           return;
         }
 
         setScreenStatus("pending");
         setMessage(
-          response.message ||
-            "Your request has been received, but the provider has not confirmed the result yet.",
+          purchaseResult.message ||
+            "Your request has been received, but the provider has not confirmed the result yet. You can check the status below.",
         );
       } catch (error) {
         if (cancelled) return;
@@ -182,7 +248,7 @@ export default function DataProcessing() {
   }, [isValidPurchase, navigate, purchase]);
 
   async function checkStatus() {
-    if (!reference || checkingStatus) return;
+    if (!reference || checkingStatus || !purchase) return;
 
     setCheckingStatus(true);
 
@@ -196,41 +262,28 @@ export default function DataProcessing() {
 
       if (!updated) {
         setMessage(
-          response.message || "The server did not return an updated status.",
+          response.message ||
+            "The server did not return an updated status.",
         );
         return;
       }
 
       setResult(updated);
+
       const status = getStatus(updated);
 
-      if (["COMPLETED", "SUCCESS", "SUCCESSFUL"].includes(status)) {
-        navigate("/data/success", {
-          replace: true,
-          state: {
-            purchase: {
-              network: purchase!.network,
-              networkName: purchase!.networkName,
-              phone: purchase!.phone,
-              displayPhone: purchase!.displayPhone,
-              bundleId: purchase!.bundleId,
-              variationCode: purchase!.variationCode,
-              bundleName: purchase!.bundleName,
-              validity: purchase!.validity,
-              amount: purchase!.amount,
-              fee: purchase!.fee,
-              total: purchase!.total,
-            },
-            result: updated,
-          },
-        });
+      if (SUCCESS_STATUSES.includes(status)) {
+        setMessage(
+          updated.message || "Data purchase completed successfully.",
+        );
+        goToSuccess(updated);
         return;
       }
 
-      if (["FAILED", "FAILURE", "REVERSED", "CANCELLED"].includes(status)) {
+      if (FAILURE_STATUSES.includes(status)) {
         setScreenStatus("failed");
         setMessage(
-          response.message ||
+          updated.message ||
             "The provider reports that this purchase was not completed.",
         );
         return;
@@ -238,7 +291,7 @@ export default function DataProcessing() {
 
       setScreenStatus("pending");
       setMessage(
-        response.message ||
+        updated.message ||
           "The transaction is still awaiting provider confirmation. You can check again shortly.",
       );
     } catch (error) {
@@ -281,7 +334,9 @@ export default function DataProcessing() {
                   : "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400"
             }`}
           >
-            {isProcessing && <LoaderCircle size={30} className="animate-spin" />}
+            {isProcessing && (
+              <LoaderCircle size={30} className="animate-spin" />
+            )}
             {isPending && <RefreshCw size={30} />}
             {isFailed && <CircleAlert size={30} />}
           </div>
@@ -303,6 +358,7 @@ export default function DataProcessing() {
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
                 <Database size={22} />
               </div>
+
               <div className="min-w-0">
                 <p className="font-semibold">{purchase.networkName}</p>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -312,6 +368,7 @@ export default function DataProcessing() {
                   {purchase.displayPhone}
                 </p>
               </div>
+
               <p className="ml-auto shrink-0 font-semibold">
                 ₦{Number(purchase.total).toLocaleString("en-NG")}
               </p>
@@ -322,7 +379,9 @@ export default function DataProcessing() {
                 <p className="text-gray-500 dark:text-gray-400">
                   Transaction reference
                 </p>
-                <p className="mt-1 break-all font-medium">{reference}</p>
+                <p className="mt-1 break-all font-medium">
+                  {reference}
+                </p>
               </div>
             )}
           </div>
@@ -341,7 +400,9 @@ export default function DataProcessing() {
               disabled={!reference || checkingStatus}
               onClick={checkStatus}
             >
-              {checkingStatus ? "Checking status..." : "Check transaction status"}
+              {checkingStatus
+                ? "Checking status..."
+                : "Check transaction status"}
             </Button>
           )}
 
@@ -355,9 +416,12 @@ export default function DataProcessing() {
                   disabled={checkingStatus}
                   onClick={checkStatus}
                 >
-                  {checkingStatus ? "Checking status..." : "Check status again"}
+                  {checkingStatus
+                    ? "Checking status..."
+                    : "Check status again"}
                 </Button>
               )}
+
               <Button
                 type="button"
                 className="w-full"
@@ -365,9 +429,10 @@ export default function DataProcessing() {
               >
                 View transaction history
               </Button>
+
               <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-                If the result is uncertain, check your transaction history before
-                starting another purchase.
+                If the result is uncertain, check your transaction
+                history before starting another purchase.
               </p>
             </div>
           )}
