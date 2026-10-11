@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:2000/api";
+const API_BASE_URL = "https://backend-eight-steel-35.vercel.app/api";
 // for deployment, change the above to "https://backend-eight-steel-35.vercel.app/api"
 
 export type ApiRequestOptions = RequestInit & { token?: string };
