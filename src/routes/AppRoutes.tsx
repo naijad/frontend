@@ -9,6 +9,8 @@ import Dashboard from "../pages/Dashboard/Dashboard";
 import Transfer from "../pages/Transfer/Transfer";
 import Transactions from "../pages/Transactions/Transactions";
 import Analytics from "../pages/Dashboard/Analytics";
+import AddMoney from "../pages/AddMoney";
+import DepositSuccess from "../pages/DepositSuccess";
 
 import Profile from "../pages/Profile/Profile";
 import AppPreferences from "../pages/Profile/AppPreferences";
@@ -65,6 +67,25 @@ export default function AppRoutes() {
             element={
               <MainLayout>
                 <Dashboard />
+              </MainLayout>
+            }
+          />
+
+          <Route
+            path="/add-money"
+            element={
+              <MainLayout>
+                <AddMoney />
+              </MainLayout>
+            }
+          />
+
+          {/* DEPOSIT SUCCESS AND VERIFICATION */}
+          <Route
+            path="/deposit-success"
+            element={
+              <MainLayout>
+                <DepositSuccess />
               </MainLayout>
             }
           />
@@ -136,21 +157,20 @@ export default function AppRoutes() {
             element={<AirtimeSuccess />}
           />
 
-          {/* DATA — MOCK CATALOGUE FOR NOW */}
-         {/* DATA FLOW */}
-            <Route
-              path="/data"
-              element={
-                <MainLayout>
-                  <Data />
-                </MainLayout>
-              }
-            />
-            <Route path="/data/confirm" element={<DataConfirmation />} />
-            <Route path="/data/pin" element={<DataPin />} />
-            <Route path="/data/processing" element={<DataProcessing />} />
-            <Route path="/data/success" element={<DataSuccess />} />
-            
+          {/* DATA FLOW */}
+          <Route
+            path="/data"
+            element={
+              <MainLayout>
+                <Data />
+              </MainLayout>
+            }
+          />
+          <Route path="/data/confirm" element={<DataConfirmation />} />
+          <Route path="/data/pin" element={<DataPin />} />
+          <Route path="/data/processing" element={<DataProcessing />} />
+          <Route path="/data/success" element={<DataSuccess />} />
+
           {/* TRANSACTIONS */}
           <Route
             path="/transactions/details"
