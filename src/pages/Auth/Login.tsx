@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -29,9 +30,7 @@ const loginSchema = z.object({
         /^0(70|80|81|90|91)\d{8}$/.test(val),
       "Enter a valid email or Nigerian phone number",
     ),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -83,11 +82,18 @@ export default function Login() {
         </>
       }
     >
+      <div className="mb-6 flex justify-center">
+        <Link to="/" aria-label="Ajora home">
+          <img
+            src="/ajora-logo.png"
+            alt="Ajora"
+            className="h-16 w-auto max-w-full object-contain"
+          />
+        </Link>
+      </div>
+
       <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {formError ? (
             <div
               role="alert"
@@ -103,7 +109,6 @@ export default function Login() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Email or phone number</FormLabel>
-
                 <FormControl>
                   <Input
                     type="text"
@@ -112,7 +117,6 @@ export default function Login() {
                     {...field}
                   />
                 </FormControl>
-
                 <FormMessage />
               </FormItem>
             )}
@@ -125,7 +129,6 @@ export default function Login() {
               <FormItem>
                 <div className="flex items-center justify-between gap-3">
                   <FormLabel>Password</FormLabel>
-
                   <Link
                     to="/forgot-password"
                     className="text-sm font-medium text-primary hover:underline"
@@ -146,13 +149,9 @@ export default function Login() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setShowPassword((value) => !value)
-                      }
+                      onClick={() => setShowPassword((value) => !value)}
                       aria-label={
-                        showPassword
-                          ? "Hide password"
-                          : "Show password"
+                        showPassword ? "Hide password" : "Show password"
                       }
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >

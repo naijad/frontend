@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -129,6 +130,16 @@ export default function Signup() {
         </>
       }
     >
+      <div className="mb-6 flex justify-center">
+        <Link to="/" aria-label="Ajora home">
+          <img
+            src="/ajora-logo.png"
+            alt="Ajora"
+            className="h-16 w-auto max-w-full object-contain"
+          />
+        </Link>
+      </div>
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {formError ? (
@@ -277,11 +288,11 @@ export default function Signup() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setShowTransactionPin((value) => !value)
-                      }
+                      onClick={() => setShowTransactionPin((value) => !value)}
                       aria-label={
-                        showTransactionPin ? "Hide transaction PIN" : "Show transaction PIN"
+                        showTransactionPin
+                          ? "Hide transaction PIN"
+                          : "Show transaction PIN"
                       }
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
