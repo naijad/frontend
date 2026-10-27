@@ -1,24 +1,14 @@
-
 import { useState } from "react";
-
 import { Link, useNavigate } from "react-router-dom";
-
 import { useForm } from "react-hook-form";
-
 import { zodResolver } from "@hookform/resolvers/zod";
-
 import { z } from "zod";
-
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import AuthLayout from "@/components/auth/AuthLayout";
-
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
-
 import { Button } from "@/components/ui/button";
-
 import { Input } from "@/components/ui/input";
-
 import {
   Form,
   FormControl,
@@ -27,7 +17,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-
 import { login } from "@/lib/auth";
 
 const loginSchema = z.object({
@@ -40,13 +29,16 @@ const loginSchema = z.object({
         /^0(70|80|81|90|91)\d{8}$/.test(val),
       "Enter a valid email or Nigerian phone number",
     ),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters"),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
+
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -84,7 +76,7 @@ export default function Login() {
           Don&apos;t have an account?{" "}
           <Link
             to="/signup"
-            className="text-primary font-semibold hover:underline"
+            className="font-semibold text-primary hover:underline"
           >
             Sign up
           </Link>
@@ -92,7 +84,10 @@ export default function Login() {
       }
     >
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-4"
+        >
           {formError ? (
             <div
               role="alert"
@@ -108,6 +103,7 @@ export default function Login() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Email or phone number</FormLabel>
+
                 <FormControl>
                   <Input
                     type="text"
@@ -116,6 +112,7 @@ export default function Login() {
                     {...field}
                   />
                 </FormControl>
+
                 <FormMessage />
               </FormItem>
             )}
@@ -126,11 +123,12 @@ export default function Login() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <FormLabel>Password</FormLabel>
+
                   <Link
                     to="/forgot-password"
-                    className="text-primary text-sm font-medium hover:underline"
+                    className="text-sm font-medium text-primary hover:underline"
                   >
                     Forgot password?
                   </Link>
@@ -148,9 +146,13 @@ export default function Login() {
 
                     <button
                       type="button"
-                      onClick={() => setShowPassword((v) => !v)}
+                      onClick={() =>
+                        setShowPassword((value) => !value)
+                      }
                       aria-label={
-                        showPassword ? "Hide password" : "Show password"
+                        showPassword
+                          ? "Hide password"
+                          : "Show password"
                       }
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >

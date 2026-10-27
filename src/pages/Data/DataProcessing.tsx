@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -40,6 +40,7 @@ type DataApiResult = {
     balance?: number | string;
     currency?: string;
   };
+  balance?: number | string;
   data?: DataApiResult;
   balanceAfter?: number | string;
   [key: string]: unknown;
@@ -52,6 +53,8 @@ type ApiEnvelope = {
 };
 
 type ScreenStatus = "processing" | "pending" | "failed";
+
+const POLL_INTERVAL_MS = 15_000;
 
 const SUCCESS_STATUSES = [
   "COMPLETED",
@@ -67,12 +70,6 @@ const FAILURE_STATUSES = [
 ];
 
 function getStatus(result: DataApiResult): string {
-  // Initial purchase response:
-  // response.data.data.transaction.status
-  //
-  // Requery response:
-  // response.data.status or response.data.transaction.status
-
   return String(
     result.status ??
       result.transaction?.status ??
@@ -97,16 +94,13 @@ function getReference(result: DataApiResult): string {
 }
 
 function normalizeResult(result: DataApiResult): DataApiResult {
-  // Make the transaction available at the top level for the
-  // success page, regardless of the backend response nesting.
   const nested = result.data;
 
   return {
     ...result,
     status: getStatus(result),
     reference: getReference(result),
-    transaction:
-      result.transaction ?? nested?.transaction,
+    transaction: result.transaction ?? nested?.transaction,
     account: result.account ?? nested?.account,
   };
 }
@@ -117,6 +111,7 @@ export default function DataProcessing() {
   const purchase = location.state as PurchaseRouteState | null;
 
   const startedRef = useRef(false);
+  const pollingRef = useRef(false);
 
   const [screenStatus, setScreenStatus] =
     useState<ScreenStatus>("processing");
@@ -140,35 +135,41 @@ export default function DataProcessing() {
 
   const reference = result ? getReference(result) : "";
 
-  function goToSuccess(purchaseResult: DataApiResult) {
-    navigate("/data/success", {
-      replace: true,
-      state: {
-        purchase: {
-          network: purchase!.network,
-          networkName: purchase!.networkName,
-          phone: purchase!.phone,
-          displayPhone: purchase!.displayPhone,
-          bundleId: purchase!.bundleId,
-          variationCode: purchase!.variationCode,
-          bundleName: purchase!.bundleName,
-          validity: purchase!.validity,
-          amount: purchase!.amount,
-          fee: purchase!.fee,
-          total: purchase!.total,
-        },
-        result: normalizeResult(purchaseResult),
-      },
-    });
-  }
+  const goToSuccess = useCallback(
+    (purchaseResult: DataApiResult) => {
+      if (!purchase) return;
 
+      navigate("/data/success", {
+        replace: true,
+        state: {
+          purchase: {
+            network: purchase.network,
+            networkName: purchase.networkName,
+            phone: purchase.phone,
+            displayPhone: purchase.displayPhone,
+            bundleId: purchase.bundleId,
+            variationCode: purchase.variationCode,
+            bundleName: purchase.bundleName,
+            validity: purchase.validity,
+            amount: purchase.amount,
+            fee: purchase.fee,
+            total: purchase.total,
+          },
+          result: normalizeResult(purchaseResult),
+        },
+      });
+    },
+    [navigate, purchase],
+  );
+
+  // Submit the purchase only once per mounted processing screen.
   useEffect(() => {
-    if (!isValidPurchase) {
+    if (!isValidPurchase || !purchase) {
       navigate("/data", { replace: true });
       return;
     }
 
-    if (startedRef.current || !purchase) return;
+    if (startedRef.current) return;
 
     startedRef.current = true;
     let cancelled = false;
@@ -193,7 +194,7 @@ export default function DataProcessing() {
         const purchaseResult = response.data;
 
         if (!purchaseResult) {
-          setScreenStatus("failed");
+          setScreenStatus("pending");
           setMessage(
             response.message ||
               "The server did not return a purchase result. Check your transaction history before trying again.",
@@ -226,16 +227,18 @@ export default function DataProcessing() {
         setScreenStatus("pending");
         setMessage(
           purchaseResult.message ||
-            "Your request has been received, but the provider has not confirmed the result yet. You can check the status below.",
+            "Your request has been received, but the provider has not confirmed the result yet.",
         );
       } catch (error) {
         if (cancelled) return;
 
-        setScreenStatus("failed");
+        // A network error does not prove the provider failed.
+        // Do not encourage another purchase when the result is unknown.
+        setScreenStatus("pending");
         setMessage(
           error instanceof Error
-            ? error.message
-            : "We couldn't confirm the purchase result. Check your transaction history before trying again.",
+            ? `${error.message} Your purchase may still be processing. Check its status before trying again.`
+            : "We couldn't confirm the purchase result. Your transaction may still be processing.",
         );
       }
     }
@@ -245,11 +248,91 @@ export default function DataProcessing() {
     return () => {
       cancelled = true;
     };
-  }, [isValidPurchase, navigate, purchase]);
+  }, [isValidPurchase, navigate, purchase, goToSuccess]);
+
+  // Automatically requery while this processing screen remains open.
+  // Requery checks the existing provider request; it never submits another
+  // data purchase. The backend remains responsible for final status/refunds.
+  useEffect(() => {
+    if (
+      screenStatus !== "pending" ||
+      !reference ||
+      !purchase
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    async function pollTransactionStatus() {
+      if (cancelled || inFlight) return;
+
+      inFlight = true;
+
+      try {
+        const response = await apiRequest<ApiEnvelope>(
+          `/data/requery/${encodeURIComponent(reference)}`,
+          { method: "POST" },
+        );
+
+        if (cancelled) return;
+
+        const updated = response.data;
+
+        if (!updated) return;
+
+        setResult(updated);
+
+        const status = getStatus(updated);
+
+        if (SUCCESS_STATUSES.includes(status)) {
+          setScreenStatus("processing");
+          setMessage(
+            updated.message ||
+              "Data purchase completed successfully.",
+          );
+          goToSuccess(updated);
+          return;
+        }
+
+        if (FAILURE_STATUSES.includes(status)) {
+          setScreenStatus("failed");
+          setMessage(
+            updated.message ||
+              "The provider confirmed that this purchase failed. Check your wallet balance and transaction history for the refund.",
+          );
+          return;
+        }
+
+        setMessage(
+          updated.message ||
+            "Your data purchase is still awaiting confirmation. We'll check again automatically.",
+        );
+      } catch {
+        // A failed status check is not proof that the purchase failed.
+        // Keep the pending state and try again at the next interval.
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    const intervalId = window.setInterval(() => {
+      void pollTransactionStatus();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [screenStatus, reference, purchase, goToSuccess]);
 
   async function checkStatus() {
-    if (!reference || checkingStatus || !purchase) return;
+    if (!reference || checkingStatus || pollingRef.current || !purchase) {
+      return;
+    }
 
+    pollingRef.current = true;
     setCheckingStatus(true);
 
     try {
@@ -274,7 +357,8 @@ export default function DataProcessing() {
 
       if (SUCCESS_STATUSES.includes(status)) {
         setMessage(
-          updated.message || "Data purchase completed successfully.",
+          updated.message ||
+            "Data purchase completed successfully.",
         );
         goToSuccess(updated);
         return;
@@ -284,7 +368,7 @@ export default function DataProcessing() {
         setScreenStatus("failed");
         setMessage(
           updated.message ||
-            "The provider reports that this purchase was not completed.",
+            "The provider confirmed that this purchase failed. Check your wallet balance and transaction history for the refund.",
         );
         return;
       }
@@ -292,7 +376,7 @@ export default function DataProcessing() {
       setScreenStatus("pending");
       setMessage(
         updated.message ||
-          "The transaction is still awaiting provider confirmation. You can check again shortly.",
+          "The transaction is still awaiting provider confirmation. We'll check again automatically.",
       );
     } catch (error) {
       setMessage(
@@ -301,6 +385,7 @@ export default function DataProcessing() {
           : "Unable to check the transaction status right now.",
       );
     } finally {
+      pollingRef.current = false;
       setCheckingStatus(false);
     }
   }
@@ -360,7 +445,9 @@ export default function DataProcessing() {
               </div>
 
               <div className="min-w-0">
-                <p className="font-semibold">{purchase.networkName}</p>
+                <p className="font-semibold">
+                  {purchase.networkName}
+                </p>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {purchase.bundleName}
                 </p>
@@ -394,16 +481,23 @@ export default function DataProcessing() {
           )}
 
           {isPending && (
-            <Button
-              type="button"
-              className="mt-6 w-full"
-              disabled={!reference || checkingStatus}
-              onClick={checkStatus}
-            >
-              {checkingStatus
-                ? "Checking status..."
-                : "Check transaction status"}
-            </Button>
+            <>
+              <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                We'll check the transaction status automatically every
+                15 seconds while this page remains open.
+              </p>
+
+              <Button
+                type="button"
+                className="mt-4 w-full"
+                disabled={!reference || checkingStatus}
+                onClick={checkStatus}
+              >
+                {checkingStatus
+                  ? "Checking status..."
+                  : "Check transaction status"}
+              </Button>
+            </>
           )}
 
           {isFailed && (
@@ -431,8 +525,8 @@ export default function DataProcessing() {
               </Button>
 
               <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-                If the result is uncertain, check your transaction
-                history before starting another purchase.
+                Check your wallet balance and transaction history to
+                confirm the refund before starting another purchase.
               </p>
             </div>
           )}

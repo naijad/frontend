@@ -121,12 +121,60 @@ function getBundleName(bundle: DataBundle) {
   return bundle.name?.trim() || bundle.variationCode;
 }
 
+/**
+ * VTpass may occasionally return duplicate catalogue entries.
+ * variationCode is the identifier used when submitting the purchase,
+ * so retain only the first valid entry for each variationCode.
+ */
+function normalizeBundles(receivedBundles: DataBundle[]): DataBundle[] {
+  const uniqueBundles = new Map<string, DataBundle>();
+
+  for (const bundle of receivedBundles) {
+    if (
+      !bundle ||
+      typeof bundle.id !== "string" ||
+      !bundle.id.trim() ||
+      typeof bundle.variationCode !== "string" ||
+      !bundle.variationCode.trim()
+    ) {
+      continue;
+    }
+
+    const variationCode = bundle.variationCode.trim();
+    const price = Number(bundle.price);
+
+    if (!Number.isFinite(price) || price <= 0) {
+      continue;
+    }
+
+    if (uniqueBundles.has(variationCode)) {
+      continue;
+    }
+
+    uniqueBundles.set(variationCode, {
+      ...bundle,
+      id: bundle.id.trim(),
+      variationCode,
+      name:
+        typeof bundle.name === "string" && bundle.name.trim()
+          ? bundle.name.trim()
+          : variationCode,
+      price,
+    });
+  }
+
+  return Array.from(uniqueBundles.values());
+}
+
 export default function Data() {
   const navigate = useNavigate();
 
   const [network, setNetwork] = useState<Network["id"] | "">("");
   const [phone, setPhone] = useState("");
+
+  // Store the provider's variation code, which identifies the actual plan.
   const [selectedBundleId, setSelectedBundleId] = useState("");
+
   const [bundles, setBundles] = useState<DataBundle[]>([]);
   const [balance, setBalance] = useState(0);
   const [loadingBalance, setLoadingBalance] = useState(true);
@@ -140,7 +188,10 @@ export default function Data() {
   );
 
   const selectedBundle = useMemo(
-    () => bundles.find((bundle) => bundle.id === selectedBundleId) ?? null,
+    () =>
+      bundles.find(
+        (bundle) => bundle.variationCode === selectedBundleId,
+      ) ?? null,
     [bundles, selectedBundleId],
   );
 
@@ -186,7 +237,7 @@ export default function Data() {
     };
   }, []);
 
-  // Load live plans whenever the selected network changes.
+  // Load and normalize the live catalogue whenever the network changes.
   useEffect(() => {
     let mounted = true;
 
@@ -207,22 +258,12 @@ export default function Data() {
         const receivedBundles = response?.data?.bundles;
 
         if (!response?.success || !Array.isArray(receivedBundles)) {
-          throw new Error("The server returned an invalid data bundle list.");
+          throw new Error(
+            "The server returned an invalid data bundle list.",
+          );
         }
 
-        const validBundles = receivedBundles
-          .map((bundle) => ({
-            ...bundle,
-            price: Number(bundle.price),
-          }))
-          .filter(
-            (bundle) =>
-              typeof bundle.id === "string" &&
-              typeof bundle.variationCode === "string" &&
-              bundle.variationCode.length > 0 &&
-              Number.isFinite(bundle.price) &&
-              bundle.price >= 0,
-          );
+        const validBundles = normalizeBundles(receivedBundles);
 
         setBundles(validBundles);
 
@@ -283,7 +324,9 @@ export default function Data() {
     }
 
     if (selectedBundle.price <= 0) {
-      setError("This data plan has an invalid price and cannot be purchased.");
+      setError(
+        "This data plan has an invalid price and cannot be purchased.",
+      );
       return;
     }
 
@@ -494,15 +537,16 @@ export default function Data() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {bundles.map((bundle) => {
-              const selected = selectedBundleId === bundle.id;
+              const selected =
+                selectedBundleId === bundle.variationCode;
 
               return (
                 <button
-                  key={`${bundle.id}-${bundle.variationCode}`}
+                  key={bundle.variationCode}
                   type="button"
                   aria-pressed={selected}
                   onClick={() => {
-                    setSelectedBundleId(bundle.id);
+                    setSelectedBundleId(bundle.variationCode);
                     setError("");
                   }}
                   className={`rounded-2xl border p-4 text-left transition-all ${

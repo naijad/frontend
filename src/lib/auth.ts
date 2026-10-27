@@ -1,4 +1,3 @@
-
 import { apiRequest } from "./api";
 import { user, allTransactions, recentTransactions } from "./mock-data";
 
@@ -54,6 +53,11 @@ interface BackendTransaction {
   createdAt: string;
 }
 
+interface ApiMessageResponse {
+  success: boolean;
+  message: string;
+}
+
 function applyUser(apiUser: BackendUser) {
   const fullName =
     `${apiUser.firstName} ${apiUser.lastName}`.trim();
@@ -87,13 +91,13 @@ function mapTransaction(t: BackendTransaction) {
         ? "received"
         : "sent"
       : [
-          "airtime",
-          "data",
-          "bill",
-          "topup",
-          "received",
-          "sent",
-        ].includes(rawType)
+            "airtime",
+            "data",
+            "bill",
+            "topup",
+            "received",
+            "sent",
+          ].includes(rawType)
         ? rawType
         : direction === "income"
           ? "received"
@@ -121,9 +125,7 @@ function mapTransaction(t: BackendTransaction) {
   };
 }
 
-function applyTransactions(
-  transactions: BackendTransaction[],
-) {
+function applyTransactions(transactions: BackendTransaction[]) {
   const mapped = transactions.map(mapTransaction);
 
   allTransactions.splice(
@@ -139,6 +141,9 @@ function applyTransactions(
   );
 }
 
+/**
+ * LOG IN
+ */
 export async function login(
   identifier: string,
   password: string,
@@ -162,10 +167,10 @@ export async function login(
 }
 
 /**
- * Signup payload.
- * The transaction PIN must contain exactly four digits.
- * confirmTransactionPin is only for frontend validation;
- * it should not be sent to the backend.
+ * SIGNUP PAYLOAD
+ *
+ * confirmTransactionPin is for frontend validation only.
+ * It must not be sent to the backend.
  */
 export interface SignupPayload {
   fullName: string;
@@ -175,6 +180,9 @@ export interface SignupPayload {
   transactionPin: string;
 }
 
+/**
+ * SIGN UP
+ */
 export async function signup(
   values: SignupPayload,
 ): Promise<void> {
@@ -206,6 +214,9 @@ export async function signup(
   applyUser(response.data.user);
 }
 
+/**
+ * RESTORE AUTHENTICATED SESSION
+ */
 export async function hydrateSession(): Promise<boolean> {
   const token = localStorage.getItem("ajora_token");
 
@@ -236,10 +247,19 @@ export async function hydrateSession(): Promise<boolean> {
   }
 }
 
+/**
+ * LOG OUT
+ */
 export function logout(): void {
   localStorage.removeItem("ajora_token");
 }
 
+/**
+ * CHANGE PASSWORD
+ *
+ * This is the existing authenticated password-change feature.
+ * It remains separate from forgotten-password recovery.
+ */
 export async function changePassword(
   currentPassword: string,
   newPassword: string,
@@ -253,6 +273,58 @@ export async function changePassword(
   });
 }
 
+/**
+ * REQUEST PASSWORD RESET
+ *
+ * POST /api/auth/forgot-password
+ */
+export async function requestPasswordReset(
+  email: string,
+): Promise<string> {
+  const response = await apiRequest<ApiMessageResponse>(
+    "/auth/forgot-password",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+      }),
+    },
+  );
+
+  return response.message;
+}
+
+/**
+ * RESET PASSWORD
+ *
+ * POST /api/auth/reset-password
+ *
+ * The backend verifies the one-time token, checks expiry,
+ * updates the password, and invalidates the token.
+ */
+export async function resetPassword(
+  token: string,
+  password: string,
+  confirmPassword: string,
+): Promise<string> {
+  const response = await apiRequest<ApiMessageResponse>(
+    "/auth/reset-password",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        token,
+        password,
+        confirmPassword,
+      }),
+    },
+  );
+
+  return response.message;
+}
+
+/**
+ * EXECUTE TRANSFER
+ */
 export async function executeTransfer(
   payload: {
     recipientName: string;
@@ -281,4 +353,3 @@ export async function executeTransfer(
 
   return response.data;
 }
-

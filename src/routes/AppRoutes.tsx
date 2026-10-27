@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Onboarding from "../pages/Onboarding/Onboarding";
 import Login from "../pages/Auth/Login";
 import Signup from "../pages/Auth/Signup";
+import ForgotPassword from "../pages/Auth/ForgotPassword";
+import ResetPassword from "../pages/Auth/ResetPassword";
 
 import Dashboard from "../pages/Dashboard/Dashboard";
 import Transfer from "../pages/Transfer/Transfer";
@@ -11,6 +13,8 @@ import Transactions from "../pages/Transactions/Transactions";
 import Analytics from "../pages/Dashboard/Analytics";
 import AddMoney from "../pages/AddMoney";
 import DepositSuccess from "../pages/DepositSuccess";
+import Bills from "../pages/Bills";
+import Merchant from "../pages/Merchant";
 
 import Profile from "../pages/Profile/Profile";
 import AppPreferences from "../pages/Profile/AppPreferences";
@@ -55,11 +59,24 @@ export default function AppRoutes() {
     <BrowserRouter>
       <ThemeProvider>
         <Routes>
-          {/* AUTHENTICATION */}
+          {/* PUBLIC AND AUTHENTICATION ROUTES */}
           <Route path="/" element={<Landing />} />
+
           <Route path="/login" element={<Login />} />
+
           <Route path="/signup" element={<Signup />} />
+
           <Route path="/onboarding" element={<Onboarding />} />
+
+          <Route
+            path="/forgot-password"
+            element={<ForgotPassword />}
+          />
+
+          <Route
+            path="/reset-password"
+            element={<ResetPassword />}
+          />
 
           {/* MAIN NAVIGATION */}
           <Route
@@ -76,6 +93,24 @@ export default function AppRoutes() {
             element={
               <MainLayout>
                 <AddMoney />
+              </MainLayout>
+            }
+          />
+
+          <Route
+            path="/bills"
+            element={
+              <MainLayout>
+                <Bills />
+              </MainLayout>
+            }
+          />
+
+          <Route
+            path="/merchant"
+            element={
+              <MainLayout>
+                <Merchant />
               </MainLayout>
             }
           />
@@ -131,11 +166,17 @@ export default function AppRoutes() {
             path="/transfer/confirm"
             element={<TransferConfirmation />}
           />
-          <Route path="/transfer/pin" element={<TransferPin />} />
+
+          <Route
+            path="/transfer/pin"
+            element={<TransferPin />}
+          />
+
           <Route
             path="/transfer/processing"
             element={<TransferProcessing />}
           />
+
           <Route
             path="/transfer/success"
             element={<TransferSuccess />}
@@ -143,15 +184,22 @@ export default function AppRoutes() {
 
           {/* AIRTIME FLOW */}
           <Route path="/airtime" element={<Airtime />} />
+
           <Route
             path="/airtime/confirm"
             element={<AirtimeConfirmation />}
           />
-          <Route path="/airtime/pin" element={<AirtimePin />} />
+
+          <Route
+            path="/airtime/pin"
+            element={<AirtimePin />}
+          />
+
           <Route
             path="/airtime/processing"
             element={<AirtimeProcessing />}
           />
+
           <Route
             path="/airtime/success"
             element={<AirtimeSuccess />}
@@ -166,10 +214,26 @@ export default function AppRoutes() {
               </MainLayout>
             }
           />
-          <Route path="/data/confirm" element={<DataConfirmation />} />
-          <Route path="/data/pin" element={<DataPin />} />
-          <Route path="/data/processing" element={<DataProcessing />} />
-          <Route path="/data/success" element={<DataSuccess />} />
+
+          <Route
+            path="/data/confirm"
+            element={<DataConfirmation />}
+          />
+
+          <Route
+            path="/data/pin"
+            element={<DataPin />}
+          />
+
+          <Route
+            path="/data/processing"
+            element={<DataProcessing />}
+          />
+
+          <Route
+            path="/data/success"
+            element={<DataSuccess />}
+          />
 
           {/* TRANSACTIONS */}
           <Route
@@ -254,7 +318,7 @@ export default function AppRoutes() {
             }
           />
 
-          {/* PASSWORD */}
+          {/* AUTHENTICATED PASSWORD CHANGE */}
           <Route
             path="/profile/security/password"
             element={
